@@ -17,7 +17,6 @@ func New(cfg *config.Config) *Handlers {
 	return &Handlers{cfg: cfg}
 }
 
-// RegisterRoutes attaches the auth endpoints directly to the provided router.
 func (h *Handlers) RegisterRoutes(r *router.Router[*core.RequestEvent]) {
 	r.POST("/api/auth/login", h.Login)
 	r.GET("/api/auth/verify", h.Verify)
@@ -27,6 +26,14 @@ func (h *Handlers) RegisterRoutes(r *router.Router[*core.RequestEvent]) {
 type loginRequest struct {
 	Email    string `json:"email"`
 	Password string `json:"password"`
+}
+
+type successResponse struct {
+	ID     string   `json:"id"`
+	Email  string   `json:"email"`
+	Name   string   `json:"name"`
+	Roles  []string `json:"roles"`
+	Active bool     `json:"active"`
 }
 
 func (h *Handlers) Login(e *core.RequestEvent) error {
@@ -55,10 +62,12 @@ func (h *Handlers) Login(e *core.RequestEvent) error {
 	// Use PocketBase's native event context to set the cookie
 	h.setSessionCookie(e, token)
 
-	return e.JSON(http.StatusOK, map[string]any{
-		"message": "login successful",
-		"id":      record.Id,
-		"email":   record.Email(),
+	return e.JSON(http.StatusOK, successResponse{
+		ID:     record.Id,
+		Email:  record.Email(),
+		Name:   record.GetString("name"),
+		Roles:  []string{}, // placeholder for role management
+		Active: true,
 	})
 }
 
@@ -73,10 +82,12 @@ func (h *Handlers) Verify(e *core.RequestEvent) error {
 		return e.UnauthorizedError("invalid or expired session", nil)
 	}
 
-	return e.JSON(http.StatusOK, map[string]any{
-		"valid": true,
-		"id":    record.Id,
-		"email": record.Email(),
+	return e.JSON(http.StatusOK, successResponse{
+		ID:     record.Id,
+		Email:  record.Email(),
+		Name:   record.GetString("name"),
+		Roles:  []string{}, // placeholder for role management
+		Active: true,
 	})
 }
 
@@ -85,9 +96,6 @@ func (h *Handlers) Logout(e *core.RequestEvent) error {
 	return e.JSON(http.StatusOK, map[string]any{"message": "logged out"})
 }
 
-// --- helpers -----------------------------------------------------------------
-
-// Note: Passing the RequestEvent (e) instead of http.ResponseWriter
 func (h *Handlers) setSessionCookie(e *core.RequestEvent, token string) {
 	e.SetCookie(&http.Cookie{
 		Name:     h.cfg.Cookie.Name,
