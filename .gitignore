@@ -1,0 +1,27 @@
+# Binaries
+agro-api
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# Go build artifacts
+*.test
+*.out
+
+# PocketBase data directory
+pb_data/
+pb_migrations/
+
+# Config overrides (keep config.yaml but ignore local overrides)
+config.local.yaml
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
