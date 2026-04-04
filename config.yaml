@@ -28,3 +28,5 @@ cookie:
 auth:
   cookieTTL: "24h"
   tokenSecret: "change-me-in-production"
+
+dev: true

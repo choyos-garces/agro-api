@@ -3,6 +3,8 @@ package config
 import (
 	"fmt"
 	"os"
+	"path/filepath"
+	"strings"
 	"time"
 
 	"gopkg.in/yaml.v3"
@@ -14,6 +16,7 @@ type Config struct {
 	CORS   CORSConfig   `yaml:"cors"`
 	Cookie CookieConfig `yaml:"cookie"`
 	Auth   AuthConfig   `yaml:"auth"`
+	Dev    bool         `yaml:"dev"`
 }
 
 // ServerConfig holds HTTP server settings.
@@ -70,25 +73,49 @@ func (d Duration) MarshalYAML() (interface{}, error) {
 	return d.Duration.String(), nil
 }
 
-// Load reads the YAML configuration file at the given path and returns a
-// populated Config.  Missing optional fields fall back to their zero values;
-// callers may apply defaults after loading.
-func Load(path string) (*Config, error) {
-	f, err := os.Open(path) //nolint:gosec // path is controlled by the caller
+// Load reads the base YAML configuration file.
+// If a ".local" version of the file exists (e.g., config.local.yaml),
+// it loads that file as well, overriding the base values.
+func Load(basePath string) (*Config, error) {
+	var cfg Config
+
+	// 1. Load the base config (e.g., config.yaml)
+	// We expect this file to exist. If it doesn't, we return an error.
+	if err := decodeFile(basePath, &cfg); err != nil {
+		return nil, fmt.Errorf("failed to load base config %q: %w", basePath, err)
+	}
+
+	// 2. Generate the local file path (config.yaml -> config.local.yaml)
+	ext := filepath.Ext(basePath)                       // gets ".yaml"
+	baseWithoutExt := strings.TrimSuffix(basePath, ext) // gets "config"
+	localPath := baseWithoutExt + ".local" + ext        // builds "config.local.yaml"
+
+	// 3. Check if the local override file exists
+	if _, err := os.Stat(localPath); err == nil {
+		// The file exists! Decode it over the SAME struct instance.
+		// It will automatically replace only the values defined in the local file.
+		if err := decodeFile(localPath, &cfg); err != nil {
+			return nil, fmt.Errorf("failed to load local override %q: %w", localPath, err)
+		}
+	}
+
+	// 4. Fill in any gaps with sensible defaults
+	applyDefaults(&cfg)
+
+	return &cfg, nil
+}
+
+// decodeFile is a private helper to open and parse a single YAML file into the config struct.
+func decodeFile(path string, cfg *Config) error {
+	f, err := os.Open(path)
 	if err != nil {
-		return nil, fmt.Errorf("open config %q: %w", path, err)
+		return err
 	}
 	defer f.Close()
 
-	var cfg Config
 	dec := yaml.NewDecoder(f)
 	dec.KnownFields(true)
-	if err := dec.Decode(&cfg); err != nil {
-		return nil, fmt.Errorf("decode config %q: %w", path, err)
-	}
-
-	applyDefaults(&cfg)
-	return &cfg, nil
+	return dec.Decode(cfg)
 }
 
 // applyDefaults fills in sensible defaults for any zero-value fields.

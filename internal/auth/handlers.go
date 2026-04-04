@@ -1,11 +1,3 @@
-// Package auth provides HTTP handlers for session-based authentication
-// built on top of PocketBase's built-in user management.
-//
-// Endpoints:
-//
-//	POST /api/auth/login   – exchange email/password for a secure session cookie
-//	GET  /api/auth/verify  – validate the current session cookie
-//	POST /api/auth/logout  – destroy the session cookie
 package auth
 
 import (
@@ -14,41 +6,29 @@ import (
 
 	"github.com/choyos-garces/agro-api/config"
 	"github.com/pocketbase/pocketbase/core"
+	"github.com/pocketbase/pocketbase/tools/router"
 )
 
-// Handlers groups all auth-related route handlers together with their shared
-// dependencies so they can be registered on the PocketBase router.
 type Handlers struct {
 	cfg *config.Config
 }
 
-// New creates a new Handlers instance bound to the given Config.
 func New(cfg *config.Config) *Handlers {
 	return &Handlers{cfg: cfg}
 }
 
-// RegisterRoutes attaches the auth endpoints to the PocketBase app router.
-func (h *Handlers) RegisterRoutes(app core.App) {
-	app.OnServe().BindFunc(func(se *core.ServeEvent) error {
-		se.Router.POST("/api/auth/login", h.Login)
-		se.Router.GET("/api/auth/verify", h.Verify)
-		se.Router.POST("/api/auth/logout", h.Logout)
-		return se.Next()
-	})
+// RegisterRoutes attaches the auth endpoints directly to the provided router.
+func (h *Handlers) RegisterRoutes(r *router.Router[*core.RequestEvent]) {
+	r.POST("/api/auth/login", h.Login)
+	r.GET("/api/auth/verify", h.Verify)
+	r.POST("/api/auth/logout", h.Logout)
 }
 
-// loginRequest is the expected JSON body for the login endpoint.
 type loginRequest struct {
 	Email    string `json:"email"`
 	Password string `json:"password"`
 }
 
-// Login authenticates a user with their email and password, then sets a
-// secure HTTP-only session cookie containing the PocketBase auth token.
-//
-//	POST /api/auth/login
-//	Content-Type: application/json
-//	{"email":"user@example.com","password":"secret"}
 func (h *Handlers) Login(e *core.RequestEvent) error {
 	var req loginRequest
 	if err := e.BindBody(&req); err != nil {
@@ -58,9 +38,6 @@ func (h *Handlers) Login(e *core.RequestEvent) error {
 		return e.BadRequestError("email and password are required", nil)
 	}
 
-	// Authenticate against the PocketBase _superusers or users collection.
-	// AuthWithPassword tries _superusers first; for regular users the collection
-	// must be specified.  We attempt "users" (the default PocketBase collection).
 	record, err := e.App.FindAuthRecordByEmail("users", req.Email)
 	if err != nil {
 		return e.UnauthorizedError("invalid credentials", nil)
@@ -75,7 +52,8 @@ func (h *Handlers) Login(e *core.RequestEvent) error {
 		return e.InternalServerError("could not create session token", err)
 	}
 
-	h.setSessionCookie(e.Response, token)
+	// Use PocketBase's native event context to set the cookie
+	h.setSessionCookie(e, token)
 
 	return e.JSON(http.StatusOK, map[string]any{
 		"message": "login successful",
@@ -84,10 +62,6 @@ func (h *Handlers) Login(e *core.RequestEvent) error {
 	})
 }
 
-// Verify checks whether the current session cookie holds a valid PocketBase
-// auth token.  Returns 200 when valid, 401 when missing or invalid.
-//
-//	GET /api/auth/verify
 func (h *Handlers) Verify(e *core.RequestEvent) error {
 	cookie, err := e.Request.Cookie(h.cfg.Cookie.Name)
 	if err != nil {
@@ -106,30 +80,16 @@ func (h *Handlers) Verify(e *core.RequestEvent) error {
 	})
 }
 
-// Logout destroys the session by overwriting the cookie with an expired one.
-//
-//	POST /api/auth/logout
 func (h *Handlers) Logout(e *core.RequestEvent) error {
-	h.clearSessionCookie(e.Response)
+	h.clearSessionCookie(e)
 	return e.JSON(http.StatusOK, map[string]any{"message": "logged out"})
 }
 
 // --- helpers -----------------------------------------------------------------
 
-// SetSessionCookieForTest is exported only for use in package tests.
-// Production code should call setSessionCookie instead.
-func (h *Handlers) SetSessionCookieForTest(w http.ResponseWriter, token string) {
-	h.setSessionCookie(w, token)
-}
-
-// ClearSessionCookieForTest is exported only for use in package tests.
-// Production code should call clearSessionCookie instead.
-func (h *Handlers) ClearSessionCookieForTest(w http.ResponseWriter) {
-	h.clearSessionCookie(w)
-}
-
-func (h *Handlers) setSessionCookie(w http.ResponseWriter, token string) {
-	http.SetCookie(w, &http.Cookie{
+// Note: Passing the RequestEvent (e) instead of http.ResponseWriter
+func (h *Handlers) setSessionCookie(e *core.RequestEvent, token string) {
+	e.SetCookie(&http.Cookie{
 		Name:     h.cfg.Cookie.Name,
 		Value:    token,
 		Path:     h.cfg.Cookie.Path,
@@ -140,8 +100,8 @@ func (h *Handlers) setSessionCookie(w http.ResponseWriter, token string) {
 	})
 }
 
-func (h *Handlers) clearSessionCookie(w http.ResponseWriter) {
-	http.SetCookie(w, &http.Cookie{
+func (h *Handlers) clearSessionCookie(e *core.RequestEvent) {
+	e.SetCookie(&http.Cookie{
 		Name:     h.cfg.Cookie.Name,
 		Value:    "",
 		Path:     h.cfg.Cookie.Path,
@@ -152,8 +112,6 @@ func (h *Handlers) clearSessionCookie(w http.ResponseWriter) {
 	})
 }
 
-// parseSameSite converts the string representation from the config file into
-// the http.SameSite enum value.
 func parseSameSite(s string) http.SameSite {
 	switch s {
 	case "Strict":
