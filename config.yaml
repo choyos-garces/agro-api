@@ -16,6 +16,11 @@ cors:
   allowedHeaders:
     - Content-Type
     - Authorization
+    - Accept
+    - Origin
+    - X-Requested-With
+    - Cache-Control
+    - Pragma
   allowCredentials: true
 
 cookie:
