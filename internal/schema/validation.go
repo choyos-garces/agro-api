@@ -3,6 +3,7 @@ package schema
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 )
 
 // GeoJSON represents the strict shape we expect from the frontend.
@@ -14,24 +15,34 @@ type GeoJSON struct {
 
 // ValidateGeoJSON checks if a string is a valid GeoJSON object.
 func ValidateGeoJSON(rawJson string) error {
-	// 1. PocketBase might pass an empty string if the field isn't required
 	if rawJson == "" {
 		return nil
 	}
 
-	// 2. Try to parse the string into our struct (like JSON.parse in JS)
 	var geo GeoJSON
 	if err := json.Unmarshal([]byte(rawJson), &geo); err != nil {
 		return errors.New("data is not a valid JSON object")
 	}
 
-	// 3. Manually enforce your specific business rules
-	if geo.Type != "Polygon" && geo.Type != "MultiPolygon" {
-		return errors.New("geojson 'type' must be Polygon or MultiPolygon")
+	// 1. Validate the 'type' (The Go equivalent of a TS Union Type)
+	switch geo.Type {
+	case "Point", "LineString", "Polygon", "MultiPoint", "MultiLineString", "MultiPolygon":
+		// It's valid, do nothing and continue!
+	default:
+		// fmt.Errorf allows us to inject variables into strings, just like template literals (`...`) in JS
+		return fmt.Errorf("invalid type '%s'. Must be Point, LineString, Polygon, MultiPoint, MultiLineString, or MultiPolygon", geo.Type)
 	}
 
+	// 2. Validate 'coordinates' exists
 	if geo.Coordinates == nil {
-		return errors.New("geojson is missing 'coordinates'")
+		return errors.New("missing 'coordinates' property")
+	}
+
+	// 3. Validate 'coordinates' is actually an array (any[])
+	// This is a "Type Assertion" in Go. It checks if the dynamic interface{}
+	// is actually a JSON array under the hood.
+	if _, isArray := geo.Coordinates.([]interface{}); !isArray {
+		return errors.New("'coordinates' must be an array")
 	}
 
 	return nil
