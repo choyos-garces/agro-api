@@ -32,8 +32,11 @@ func init() {
 			Name: "region",
 		})
 
+		minArea := 1.0
 		collection.Fields.Add(&core.NumberField{
-			Name: "area",
+			Name:     "area",
+			Required: true,
+			Min:      &minArea,
 		})
 
 		collection.Fields.Add(&core.BoolField{
