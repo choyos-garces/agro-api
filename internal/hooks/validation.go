@@ -8,7 +8,7 @@ import (
 
 func Register(app core.App) {
 
-	geoCollections := []string{"tracts"} // Add more collection names here as needed
+	geoCollections := []string{"tracts", "plots", "infrastructure"} // Add more collection names here as needed
 
 	// Register the Data Validation
 	app.OnRecordCreateRequest(geoCollections...).BindFunc(validateGeometryHook)
