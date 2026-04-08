@@ -44,6 +44,13 @@ func init() {
 			Values:    []string{"active", "archived"},
 		})
 
+		minArea := 0.1
+		plotsCol.Fields.Add(&core.NumberField{
+			Name:     "area",
+			Required: true,
+			Min:      &minArea,
+		})
+
 		plotsCol.Fields.Add(&core.SelectField{
 			Name:      "condition",
 			Required:  true,
