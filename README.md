@@ -36,33 +36,30 @@ When running serve, the app injects the HTTP bind address from config server.hos
 ## Development
 
 Install dependencies:
-    go mod download
-
+```shell
+go mod download
+```
 Run with default base config resolution:
-    go run . serve
-
-Run with explicit config base file:
-    go run . serve --config=config.yaml
-
-Run with manual HTTP override (takes precedence):
-    go run . serve --http=localhost:8092
-
+```shell
+go run . serve
+```
 Run tests:
-    go test ./...
+```shell
+go test ./...
+```
 
 ## Production
+Output the right binary for your target platform:
+```shell
+CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags="-s -w" -o api-bin .
+```
 
-Build:
-    go build -o agro-api .
-
-Run with default config loading:
-    ./agro-api serve
-
-Run with explicit base config:
-    ./agro-api serve --config=config.yaml
-
-Run with explicit HTTP bind override:
-    ./agro-api serve --http=0.0.0.0:8090
+Desploys the binary to the server and restarts the service:
+```shell
+ssh vps "systemctl stop api-bin"
+scp api-bin vps:/var/www/agro-api/
+ssh vps "systemctl start api-bin"
+```
 
 ## Config Files
 

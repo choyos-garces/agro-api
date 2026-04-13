@@ -1,11 +1,12 @@
 package main
 
 import (
+	"errors"
 	"log"
 	"os"
+	"strings"
 
 	"github.com/choyos-garces/agro-api/config"
-	"github.com/choyos-garces/agro-api/internal/auth"
 	"github.com/choyos-garces/agro-api/internal/hooks"
 	_ "github.com/choyos-garces/agro-api/migrations"
 
@@ -52,30 +53,55 @@ func main() {
 		customCors.Id = apis.DefaultCorsMiddlewareId // Override the default CORS middleware
 		se.Router.Bind(customCors)
 
-		// Middleware to check for auth cookie and convert it to Authorization header
-		// becuase Pocketbase is autistic and doesn't do this by default
-		se.Router.BindFunc(func(e *core.RequestEvent) error {
-			// If PocketBase hasn't already authenticated them via headers...
-			if e.Auth == nil {
-				cookie, err := e.Request.Cookie(cfg.Cookie.Name)
-				if err == nil && cookie.Value != "" {
-					// 1. Ask the database if this cookie token is valid
-					record, err := app.FindAuthRecordByToken(cookie.Value, core.TokenTypeAuth)
-					if err == nil {
-						// 2. FORCE the authentication context for this request!
-						// Now the API rules will see you as a logged-in user.
-						e.Auth = record
-					}
-				}
-			}
-			return e.Next()
-		})
+		usersCollection, err := app.FindCollectionByNameOrId("users")
+		if err != nil {
+			return err
+		}
 
-		// Register Custom Routes (using the updated se.Router signature)
-		authHandlers := auth.New(cfg)
-		authHandlers.RegisterRoutes(se.Router)
+		usersCollection.OAuth2 = core.OAuth2Config{
+			Enabled: true,
+			Providers: []core.OAuth2ProviderConfig{
+				{
+					Name:         "google",
+					ClientId:     cfg.Google.ClientID,     // From your config.yaml
+					ClientSecret: cfg.Google.ClientSecret, // From your config.yaml
+				},
+			},
+		}
+
+		// 3. Save the collection to persist the changes in the DB
+		if err := app.Save(usersCollection); err != nil {
+			return err
+		}
 
 		return se.Next()
+	})
+
+	// OAUTH2 DOMAIN RESTRICTION HOOK
+	app.OnRecordAuthWithOAuth2Request("users").BindFunc(func(e *core.RecordAuthWithOAuth2RequestEvent) error {
+		// Check to make sure users is comming from an allowed domain. This is really not
+		// necessary since the client is set a `internal` provider, but might as well be safe.
+		if e.OAuth2User != nil {
+			email := e.OAuth2User.Email
+
+			allowedDomains := []string{"@hoyosgarces.com", "@hygagro.com"}
+			domainAllowed := false
+			for _, domain := range allowedDomains {
+				if strings.HasSuffix(email, domain) {
+					domainAllowed = true
+					break
+				}
+			}
+
+			// If the email didn't match any domain in the list, reject it
+			if !domainAllowed {
+				return errors.New("unauthorized domain: please use your company email")
+			}
+
+		}
+
+		// Continue the authentication flow
+		return e.Next()
 	})
 
 	// REGISTER HOOKS (Database and Record events)

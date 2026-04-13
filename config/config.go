@@ -14,15 +14,19 @@ import (
 type Config struct {
 	Server ServerConfig `yaml:"server"`
 	CORS   CORSConfig   `yaml:"cors"`
-	Cookie CookieConfig `yaml:"cookie"`
-	Auth   AuthConfig   `yaml:"auth"`
 	Dev    bool         `yaml:"dev"`
+	Google GoogleConfig `yaml:"google"`
 }
 
 // ServerConfig holds HTTP server settings.
 type ServerConfig struct {
 	Host string `yaml:"host"`
 	Port int    `yaml:"port"`
+}
+
+type GoogleConfig struct {
+	ClientID     string `yaml:"clientID"`
+	ClientSecret string `yaml:"clientSecret"`
 }
 
 // Addr returns the formatted "host:port" address.
@@ -36,21 +40,6 @@ type CORSConfig struct {
 	AllowedMethods   []string `yaml:"allowedMethods"`
 	AllowedHeaders   []string `yaml:"allowedHeaders"`
 	AllowCredentials bool     `yaml:"allowCredentials"`
-}
-
-// CookieConfig holds session cookie settings.
-type CookieConfig struct {
-	Name     string `yaml:"name"`
-	Secure   bool   `yaml:"secure"`
-	HTTPOnly bool   `yaml:"httpOnly"`
-	SameSite string `yaml:"sameSite"`
-	Path     string `yaml:"path"`
-}
-
-// AuthConfig holds authentication settings.
-type AuthConfig struct {
-	CookieTTL   Duration `yaml:"cookieTTL"`
-	TokenSecret string   `yaml:"tokenSecret"`
 }
 
 // Duration is a wrapper around time.Duration to support YAML unmarshalling
@@ -134,17 +123,5 @@ func applyDefaults(cfg *Config) {
 	}
 	if len(cfg.CORS.AllowedHeaders) == 0 {
 		cfg.CORS.AllowedHeaders = []string{"Content-Type", "Authorization"}
-	}
-	if cfg.Cookie.Name == "" {
-		cfg.Cookie.Name = "agro_session"
-	}
-	if cfg.Cookie.Path == "" {
-		cfg.Cookie.Path = "/"
-	}
-	if cfg.Cookie.SameSite == "" {
-		cfg.Cookie.SameSite = "Strict"
-	}
-	if cfg.Auth.CookieTTL.Duration == 0 {
-		cfg.Auth.CookieTTL.Duration = 24 * time.Hour
 	}
 }
