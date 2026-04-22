@@ -64,6 +64,7 @@ func init() {
 		plotsCol.Fields.RemoveByName("category")
 		plotsCol.Fields.RemoveByName("status")
 		plotsCol.Fields.RemoveByName("condition")
+		plotsCol.Fields.RemoveByName("area")
 		plotsCol.Fields.Add(&core.BoolField{
 			Name: "active",
 		})
@@ -94,6 +95,13 @@ func init() {
 			Required:  true,
 			MaxSelect: 1,
 			Values:    []string{"permanent", "temporary"},
+		})
+
+		minArea := 0.1
+		plotsCol.Fields.Add(&core.NumberField{
+			Name:     "area",
+			Required: true,
+			Min:      &minArea,
 		})
 
 		plotsCol.Fields.Add(&core.SelectField{
