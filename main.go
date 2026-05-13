@@ -41,6 +41,17 @@ func main() {
 
 	// SERVER SETUP HOOK
 	app.OnServe().BindFunc(func(se *core.ServeEvent) error {
+		settings := app.Settings()
+
+		// Enable Batch API if not already enabled
+		if !settings.Batch.Enabled {
+			settings.Batch.Enabled = true
+			if err := app.Save(settings); err != nil {
+				return err
+			}
+
+			log.Println("✅ Batch API Enabled")
+		}
 
 		// Replace default CORS with our config-driven CORS
 		customCors := apis.CORS(apis.CORSConfig{
