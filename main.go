@@ -13,6 +13,7 @@ import (
 	"github.com/pocketbase/pocketbase"
 	"github.com/pocketbase/pocketbase/apis"
 	"github.com/pocketbase/pocketbase/core"
+	"github.com/pocketbase/pocketbase/plugins/jsvm"
 	"github.com/pocketbase/pocketbase/plugins/migratecmd"
 )
 
@@ -36,6 +37,10 @@ func main() {
 
 	// INITIALIZE POCKETBASE
 	app := pocketbase.New()
+
+	jsvm.MustRegister(app, jsvm.Config{
+			HooksWatch: true,
+		})
 
 	app.RootCmd.PersistentFlags().String("config", "config.yaml", "path to the base YAML config file")
 
