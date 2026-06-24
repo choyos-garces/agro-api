@@ -58,6 +58,7 @@ Desploys the binary to the server and restarts the service:
 ```shell
 ssh vps "systemctl stop api-bin"
 scp api-bin vps:/var/www/agro-api/
+scp -r pb_hooks vps:/var/www/agro-api/
 ssh vps "systemctl start api-bin"
 ```
 
